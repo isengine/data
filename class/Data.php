@@ -25,8 +25,8 @@ class Data extends Master {
 		$this -> format = $format;
 	}
 	
-	public function randomize() {
-		$this -> settings = Objects::randomize($this -> settings);
+	public function random() {
+		$this -> settings = Objects::random($this -> settings);
 	}
 	
 	public function reverse() {
