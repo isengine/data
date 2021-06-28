@@ -17,3 +17,8 @@ $view = View::getInstance();
 <div class="item">
 	<?= $data['title']; ?>
 </div>
+<?php if ($item['cookie']) { ?>
+<script>
+	<?= $item['cookie']; ?>
+</script>
+<?php }; ?>
