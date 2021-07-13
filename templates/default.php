@@ -19,7 +19,7 @@ $template = $object -> get('template');
 <div class="<?= $instance; ?>">
 	
 	<?php
-		$object -> reverse();
+		$object -> reverseData();
 		$object -> read($template, 10);
 	?>
 	

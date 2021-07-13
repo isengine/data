@@ -10,7 +10,7 @@ use is\Masters\View;
 
 $view = View::getInstance();
 
-$item = Objects::last($object -> settings, 'value');
+$item = Objects::last($object -> getData(), 'value');
 $data = &$item['data'];
 
 if (
