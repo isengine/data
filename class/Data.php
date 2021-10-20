@@ -5,156 +5,300 @@ namespace is\Masters\Modules\Isengine;
 use is\Helpers\System;
 use is\Helpers\Objects;
 use is\Helpers\Strings;
-use is\Helpers\Sessions;
+use is\Helpers\Parser;
+use is\Helpers\Prepare;
+use is\Helpers\Local;
 use is\Helpers\Datetimes;
+use is\Helpers\Sessions;
 
-use is\Masters\Modules\Master;
+use is\Components\Collection;
+use is\Components\Datetime;
+
 use is\Masters\View;
 
-use is\Components\Datetime;
+use is\Masters\Modules\Master;
 
 class Data extends Master {
 	
-	public $processing;
-	public $format;
-	public $time;
-	public $dt;
+	public $format; // входящий формат даты и времени
+	public $dt; // объект Datatime
+	
+	public $tvar; // объект обработчика текстовых переменных
+	
+	public $custom; // массив настроек, содержит названия элементов, см.метод names
+	
+	/*
+	* Этот класс является универсальным классом для работы с любыми данными,
+	* включая обход вложенных массивов с рекурсией
+	* 
+	* Когда мы делали этот класс, мы старались одновременно
+	* максимально упростить работу с данными,
+	* автоматизировать ее
+	* и кастомизировать
+	* 
+	* благодаря этому, работа по подготовке данных ушла в шаблон
+	* из которого можно вызывать блоки в качестве отдельных элементов итерации
+	*/
+	
+	public function collection($data = null) {
+		// создает из данных коллекцию
+		// это значит, что данные можно будет сортировать, фильтровать и прочее
+		$this -> data = new Collection;
+		// для работы использовать $object -> collection($data)
+		// если пропустить $data, будет подставлен $this -> settings
+		$this -> data -> addByList($data ? $data : $this -> settings);
+	}
+	
+	public function tvars(&$item) {
+		// вызывает обработку текстовых переменных для элемента
+		$item = $this -> tvars -> launch($item);
+	}
+	
+	public function dtGet($item, $format = null) {
+		// возвращает дату в нужном формате
+		// иначе формат даты остается без преобразований
+		// если item = null, вернет текущую метку
+		return $this -> dt -> convertDate($item, null, $format);
+	}
+	
+	public function dtFormat($format) {
+		// задает входящий формат для даты и времени
+		$this -> format = $format;
+		$this -> dt -> setFormat($format);
+	}
+	
+	public function dtCompare($ctime = null, $dtime = null) {
+		// проверка даты, возвращает результат
+		// если результат отрицательный, значит дата находится в заданных рамках
+		// если результат 1 или -1, то данные можно пропустить
+		return $this -> dt -> compareDate($ctime, $dtime, $this -> format);
+	}
+	
+	public function cookie($cookie) {
+		
+		// метод проверяет куку в сессии по заданному имени
+		// если куки нет, возвращает код ее добавления в скрипт
+		// если кука есть, то возвращает пустое значение null
+		// передается один аргумент в виде массива
+		//   name - имя куки, обычно $instance и имя материала
+		//   time - время жизни куки,
+		// в секундах или спец.формате, например '1:hour' или '3600'
+		
+		$time = time();
+		$c_ses = Sessions::getCookie('is-expired-' . $cookie['name']);
+		$c_set = Datetimes::amount($cookie['time']);
+		
+		// проверка куки, возвращает результат
+		return ($c_set > 0 && $c_ses + $c_set <= $time) ? 'document.cookie = "is-expired-' . $cookie['name'] . '=' . $time . 'path=/; max-age=' . $c_set . '";' : null;
+		
+	}
+	
+	public function names($array = null) {
+		
+		// служебный метод вывода массива служебных ключей
+		// id - для хранения идетнификатора, с учетом вложенности
+		// например 0, 0:1, 0:1:0, 2:2:10 и т.д.
+		// level - для хранения уровня вложенности
+		// format - для входящего формата даты и времени
+		// ctime - для времени создания материала, в заданном формате
+		// dtime - для времени удаления материала, в заданном формате
+		// cookie - массив, содержащий ключи
+		//   name - для имени куки
+		//   time - для времени хранения куки
+		// iterable - триггер вложенности данных, т.е. имеет ли смысл их итерировать
+		// data - для хранения массива вложенных данных
+		
+		return ['id', 'level', 'format', 'ctime', 'dtime', 'cookie', 'iterable', 'data'];
+		
+	}
+	
+	public function custom($array = null, $val = null) {
+		
+		// метод заполнения массива ключей, см.метод names
+		// например, ['id' => 'sku', 'level' => 'inside', ...]
+		// для получения стандартных значений, используйте
+		// $object -> custom();
+		// чтобы задать отдельное значение, используйте
+		// $object -> custom(key, value);
+		
+		$names = $this -> names();
+		
+		if (!$array && !$val) {
+			$this -> custom = Objects::join($names, $names);
+		} elseif (is_array($array)) {
+			foreach ($names as $item) {
+				$this -> custom[$item] = $array[$item];
+			}
+			unset($item);
+		} else {
+			$this -> custom[$array] = $val;
+		}
+		
+	}
 	
 	public function launch() {
-		$this -> dt = Datetime::getInstance();
-		$this -> time = time();
+		
 		if (!System::typeIterable($this -> settings)) {
-			return;
-		}
-		$this -> processingPrepare();
-		$this -> processingLaunch($this -> settings);
-		$this -> processingExtract();
-	}
-	
-	public function format($format) {
-		$this -> format = $format;
-	}
-	
-	public function read($name = 'default', $limit = null) {
-		
-		// проверяет куки, дату, преобразует языки и текстовые переменные
-		// в итоге открывает шаблон вывода одиночного материала из блоков
-		
-		if (!System::typeIterable($this -> data)) {
-			return;
+			return true;
 		}
 		
-		$count = 0;
+		$this -> custom();
 		
-		foreach ($this -> getData() as $key => $item) {
+		$this -> setData( $this -> settings );
+		
+		$this -> dt = Datetime::getInstance();
+		// для работы обязательно запустить dtFormat(...)
+		// например, $object -> dtFormat($item['format']);
+		
+		$view = View::getInstance();
+		$this -> tvars = $view -> get('tvars');
+		unset($view);
+		// для работы использовать $this -> tvars(...)
+		// например, $object -> tvars($item['title']);
+		
+		// мы сейчас не будем останавливаться
+		// на автоматизации структуры и подсчетах
+		// и нам незачем сейчас читать базу данных
+		// мы пока выключим все возможности, кроме базовой
+		
+		/*
+		$this -> structure = $this -> settings['structure'];
+		
+		$this -> data = new Collection;
+		
+		$this -> read();
+		$this -> sort($this -> settings['sort']);
+		$this -> limit($this -> settings['skip'], $this -> settings['limit']);
+		
+		// подсчет не точный,
+		// т.к. один и тот же товар в разных категориях
+		// будет считать каждый раз,
+		// хотя так складывать неправильно
+		// но алгоритм подсчета класса map в этом не виноват,
+		// а виновата выборка в методе counter этого класса
+		$this -> data -> countMap(true);
+		//$this -> data -> countMap();
+		
+		$this -> count = &$this -> data -> map -> count;
+		$this -> total = &$this -> data -> map -> total;
+		*/
+	}
+	
+	public function iterate($callback, $callback_after = null, $array = null, $recursive = true) {
+		
+		/*
+		* метод для запуска из-под шаблона в виде:
+		* iterate(function($data){
+		*   ...
+		* });
+		* 
+		* тест:
+		* $object -> iterate(function($data){
+		*   System::debug($data);
+		* });
+		* 
+		* пример:
+		* <?php $object -> iterate(function($data){ ?>
+		*   <div class="item">
+		*     <a href="<?= $data['link']; ?>">
+		*       <p><?= $data['name']; ?></p>
+		*     </a>
+		*   </div>
+		* <? }); ?>
+		*/
+		
+		// здесь мы задаем массив данных по-умолчанию
+		$data = $array ? $array[ $this -> custom['data'] ] : $this -> settings;
+		
+		// здесь мы отменяем итерацию, если нечего итерировать
+		if (!is_array($data)) {
+			return;
+		}
+		
+		// здесь мы задаем базовые значения
+		$return = null;
+		$names = Objects::remove($this -> names(), 'data');
+		
+		// здесь берем значения из кастомных ключей
+		// и присваиваем их переменным со стандартными именами
+		// (раньше было массиву со стандартными ключами)
+		foreach ($names as $item) {
+			$val = $array[ $this -> custom[$item] ];
+			$$item = System::set($val) ? $val : null;
+		}
+		unset($item);
+		
+		if ($id === null) {
+			$id = [];
+		}
+		if ($level === null) {
+			$level = -1;
+		}
+		
+		$level++;
+		
+		foreach ($data as $key => $item) {
 			
-			$data = $item['data'];
+			$id[$level] = $key;
+			$iterable = System::typeIterable($item[ $this -> custom['data'] ]);
+			
+			foreach ($names as $i) {
+				$c = &$item[ $this -> custom[$i] ];
+				if ($$i) {
+					$c = $$i;
+				} elseif ($c) {
+					$$i = $c;
+				}
+				unset($c);
+			}
+			unset($i);
+			
+			// проверка куки, если они заданы
+			if ($cookie['name'] && $cookie['time']) {
+				$cookies = $this -> cookie($cookie);
+				if (!$cookies) {
+					continue;
+				}
+				$item[ $this -> custom['cookie'] ] = $cookies;
+				unset($cookies);
+			}
+			
+			// устанавливаем формат дат, если он задан
+			if ($format) {
+				$this -> dtFormat($format);
+			}
+			
+			// проверка дат, если они заданы
 			if (
-				!System::typeIterable($item) ||
-				!System::typeIterable($data)
+				($ctime || $dtime) &&
+				!$this -> dtCompare($ctime, $dtime)
 			) {
 				continue;
 			}
 			
-			if ($this -> compareDate($item)) {
-				if (!$this -> compareCookie($item)) {
-					// скрипт добавления куки в item['cookie']
-					$item['cookie'] = $this -> scriptCookie($item);
-					// загрузка шаблона из блоков
-					if ( !System::includes($name, $this -> custom . 'blocks', null, $item) ) {
-						System::includes($name, $this -> path . 'blocks', null, $item);
-					}
-				}
+			// запуск функции вывода 'до'
+			$return .= call_user_func($callback, $item);
+			
+			if ($recursive && $iterable) {
+				// запуск внутренней итерации
+				$this -> iterate($callback, $callback_after, $item, $recursive);
 			}
 			
-			if ($limit) {
-				$count++;
-				if ($count >= $limit) {
-					break;
-				}
+			// запуск функции вывода 'после'
+			if ($callback_after) {
+				$return .= call_user_func($callback_after, $item);
 			}
 			
 		}
-		unset($key, $item);
+		unset($item);
+		
+		$level--;
+		
+		return $return;
 		
 	}
 	
-	public function compareDate($item) {
-		// проверка даты, возвращает результат
-		return $this -> dt -> compareDate($item['ctime'], $item['dtime'], $item['format'] ? $item['format'] : $this -> format);
-	}
-	
-	public function compareCookie(&$item) {
-		// проверка куки, возвращает результат
-		$item['cookie'] = $item['cookie'] ? Datetimes::amount($item['cookie']) : null;
-		$cookie = Sessions::getCookie('is-expired-' . $item['name']);
-		$cookie = $cookie + $item['cookie'] > $this -> time;
-		return $cookie;
-	}
-	
-	public function scriptCookie($item) {
-		// скрипт с записью куки
-		return $item['cookie'] ? 'document.cookie = "is-expired-' . $item['name'] . '=' . $this -> time . 'path=/; max-age=' . $item['cookie'] . '";' : null;
-	}
-	
-	public function processingExtract() {
-		// извлекает данные в data модуля, а настройки оставляет без этих данных
-		if ($this -> settings['data']) {
-			$this -> setData( $this -> settings['data'] );
-			unset( $this -> settings['data'] );
-		} else {
-			$this -> setData( $this -> settings );
-			unset( $this -> settings );
-		}
-	}
-	
-	public function processingPrepare() {
-		
-		$view = View::getInstance();
-		
-		$this -> processing = [
-			// определяет текущий язык и язык по-умолчанию
-			'lang' => [
-				$view -> get('state|lang'),
-				$view -> get('state|langs:default')
-			],
-			// подготавливает обработчик текстовых переменных
-			'tvars' => $view -> get('tvars')
-		];
-		
-	}
-	
-	public function processingLaunch(&$data) {
-		return Objects::each($data, function($item) {
-			
-			// нужно добавить в настройки преобразование языков "val" : {"ru" : "..."} -> "val" : "..."
-			if (System::typeIterable($item)) {
-				$keys = Objects::keys($item);
-				$l_cur = $this -> processing['lang'][0];
-				$l_def = $this -> processing['lang'][1];
-				if (Objects::match($keys, $l_cur)) {
-					$item = $item[ $l_cur ];
-				} elseif (Objects::match($keys, $l_def)) {
-					$item = $item[ $l_def ];
-				} else {
-					$this -> processingLaunch($item);
-				}
-			}
-			
-			// нужно добавить в настройки текстовые переменные
-			if (
-				System::type($item, 'string') &&
-				Strings::match($item, '{') &&
-				Strings::match($item, '}')
-			) {
-				$item = $this -> processing['tvars'] -> launch($item);
-			}
-			
-			return $item;
-			
-		});
-	}
-	
+
 }
 
 ?>
