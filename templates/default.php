@@ -6,21 +6,27 @@ use is\Helpers\System;
 use is\Helpers\Objects;
 use is\Helpers\Strings;
 
-$instance = $object -> get('instance');
-$template = $object -> get('template');
+$instance = $this -> get('instance');
+$template = $this -> get('template');
 
-//$object -> eget('container') -> addClass('new');
-//$object -> eget('container') -> open(true);
-//$object -> eget('container') -> close(true);
-//$object -> eget('container') -> print();
+//$this -> eget('container') -> addClass('new');
+//$this -> eget('container') -> open(true);
+//$this -> eget('container') -> close(true);
+//$this -> eget('container') -> print();
 
 ?>
 
 <div class="<?= $instance; ?>">
 	
 	<?php
-		$object -> reverseData();
-		$object -> read($template, 10);
+		$this -> reverseData();
+		$this -> iterate(function($item){
+	?>
+		<div>
+			<?php System::debug($item, '!q'); ?>
+		</div>
+	<?php
+		});
 	?>
 	
 </div>

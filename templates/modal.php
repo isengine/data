@@ -12,7 +12,7 @@ $view = View::getInstance();
 
 $print = null;
 
-$object -> iterate(function($item) use (&$print, &$view){
+$this -> iterate(function($item) use (&$print, &$view){
 ?>
 <!-- Modal -->
 <div class="modal fade" id="modal-<?= $item['name']; ?>" tabindex="-1" aria-labelledby="modalLabel-<?= $item['name']; ?>" aria-hidden="true">

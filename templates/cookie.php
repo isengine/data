@@ -12,7 +12,7 @@ $view = View::getInstance();
 
 $print = null;
 
-$object -> iterate(function($item) use (&$print, &$view){
+$this -> iterate(function($item) use (&$print, &$view){
 ?>
 <div class="position-fixed bottom-0 m-4 p-4 bg-white border" id="block-<?= $item['name']; ?>"<?= $item['delay'] ? ' style="display:none;"' : null; ?>>
 	<div class="row justify-content-center align-items-center">

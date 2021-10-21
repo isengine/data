@@ -8,8 +8,7 @@ use is\Helpers\Strings;
 
 use is\Masters\View;
 
-$item = &$object;
-$data = &$object['data'];
+$data = &$item['data'];
 
 $view = View::getInstance();
 

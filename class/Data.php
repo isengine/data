@@ -21,9 +21,10 @@ use is\Masters\Modules\Master;
 class Data extends Master {
 	
 	public $format; // входящий формат даты и времени
-	public $dt; // объект Datatime
+	public $datetime; // объект Datatime
 	
 	public $tvar; // объект обработчика текстовых переменных
+	public $translit; // объект транслитирования строк
 	
 	public $custom; // массив настроек, содержит названия элементов, см.метод names
 	
@@ -44,7 +45,7 @@ class Data extends Master {
 		// создает из данных коллекцию
 		// это значит, что данные можно будет сортировать, фильтровать и прочее
 		$this -> data = new Collection;
-		// для работы использовать $object -> collection($data)
+		// для работы использовать $this -> collection($data)
 		// если пропустить $data, будет подставлен $this -> settings
 		$this -> data -> addByList($data ? $data : $this -> settings);
 	}
@@ -54,24 +55,29 @@ class Data extends Master {
 		$item = $this -> tvars -> launch($item);
 	}
 	
-	public function dtGet($item, $format = null) {
+	public function translit($item, $to = null, $from = null) {
+		// вызывает транслитирование строки
+		return $this -> translit -> launch($item, $to, $from);
+	}
+	
+	public function datetime($item, $format = null) {
 		// возвращает дату в нужном формате
 		// иначе формат даты остается без преобразований
 		// если item = null, вернет текущую метку
-		return $this -> dt -> convertDate($item, null, $format);
+		return $this -> datetime -> convertDate($item, null, $format);
 	}
 	
-	public function dtFormat($format) {
+	public function datetimeFormat($format) {
 		// задает входящий формат для даты и времени
 		$this -> format = $format;
-		$this -> dt -> setFormat($format);
+		$this -> datetime -> setFormat($format);
 	}
 	
-	public function dtCompare($ctime = null, $dtime = null) {
+	public function datetimeCompare($ctime = null, $dtime = null) {
 		// проверка даты, возвращает результат
 		// если результат отрицательный, значит дата находится в заданных рамках
 		// если результат 1 или -1, то данные можно пропустить
-		return $this -> dt -> compareDate($ctime, $dtime, $this -> format);
+		return $this -> datetime -> compareDate($ctime, $dtime, $this -> format);
 	}
 	
 	public function cookie($cookie) {
@@ -117,9 +123,9 @@ class Data extends Master {
 		// метод заполнения массива ключей, см.метод names
 		// например, ['id' => 'sku', 'level' => 'inside', ...]
 		// для получения стандартных значений, используйте
-		// $object -> custom();
+		// $this -> custom();
 		// чтобы задать отдельное значение, используйте
-		// $object -> custom(key, value);
+		// $this -> custom(key, value);
 		
 		$names = $this -> names();
 		
@@ -146,15 +152,16 @@ class Data extends Master {
 		
 		$this -> setData( $this -> settings );
 		
-		$this -> dt = Datetime::getInstance();
-		// для работы обязательно запустить dtFormat(...)
-		// например, $object -> dtFormat($item['format']);
+		$this -> datetime = Datetime::getInstance();
+		// для работы обязательно запустить datetimeFormat(...)
+		// например, $this -> datetimeFormat($item['format']);
 		
 		$view = View::getInstance();
 		$this -> tvars = $view -> get('tvars');
+		$this -> translit = $view -> get('translit');
 		unset($view);
 		// для работы использовать $this -> tvars(...)
-		// например, $object -> tvars($item['title']);
+		// например, $this -> tvars($item['title']);
 		
 		// мы сейчас не будем останавливаться
 		// на автоматизации структуры и подсчетах
@@ -193,12 +200,12 @@ class Data extends Master {
 		* });
 		* 
 		* тест:
-		* $object -> iterate(function($data){
+		* $this -> iterate(function($data){
 		*   System::debug($data);
 		* });
 		* 
 		* пример:
-		* <?php $object -> iterate(function($data){ ?>
+		* <?php $this -> iterate(function($data){ ?>
 		*   <div class="item">
 		*     <a href="<?= $data['link']; ?>">
 		*       <p><?= $data['name']; ?></p>
@@ -265,13 +272,13 @@ class Data extends Master {
 			
 			// устанавливаем формат дат, если он задан
 			if ($format) {
-				$this -> dtFormat($format);
+				$this -> datetimeFormat($format);
 			}
 			
 			// проверка дат, если они заданы
 			if (
 				($ctime || $dtime) &&
-				!$this -> dtCompare($ctime, $dtime)
+				!$this -> datetimeCompare($ctime, $dtime)
 			) {
 				continue;
 			}
