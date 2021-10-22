@@ -244,6 +244,12 @@ class Data extends Master {
 		
 		$level++;
 		
+		$target = [
+			Objects::first($data, 'key'),
+			Objects::last($data, 'key'),
+			Objects::len($data)
+		];
+		
 		foreach ($data as $key => $item) {
 			
 			$id[$level] = $key;
@@ -283,8 +289,18 @@ class Data extends Master {
 				continue;
 			}
 			
+			// задаем позицию элемента
+			$position = null;
+			if ($target[2] === 1) {
+				$position = 'alone';
+			} elseif ($key === $target[0]) {
+				$position = 'first';
+			} elseif ($key === $target[1]) {
+				$position = 'last';
+			}
+			
 			// запуск функции вывода 'до'
-			$return .= call_user_func($callback, $item);
+			$return .= call_user_func($callback, $item, $key, $position);
 			
 			if ($recursive && $iterable) {
 				// запуск внутренней итерации
@@ -293,7 +309,7 @@ class Data extends Master {
 			
 			// запуск функции вывода 'после'
 			if ($callback_after) {
-				$return .= call_user_func($callback_after, $item);
+				$return .= call_user_func($callback_after, $item, $key, $position);
 			}
 			
 		}
