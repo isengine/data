@@ -256,12 +256,14 @@ class Data extends Master {
 			$iterable = System::typeIterable($item[ $this -> custom['data'] ]);
 			
 			foreach ($names as $i) {
+				
 				$c = &$item[ $this -> custom[$i] ];
-				if ($$i) {
+				if (System::set($$i)) {
 					$c = $$i;
-				} elseif ($c) {
+				} elseif (System::set($c)) {
 					$$i = $c;
 				}
+				
 				unset($c);
 			}
 			unset($i);
