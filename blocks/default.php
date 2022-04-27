@@ -14,10 +14,10 @@ $view = View::getInstance();
 
 ?>
 <div class="item">
-	<?= $data['title']; ?>
+    <?= $data['title']; ?>
 </div>
 <?php if ($item['cookie']) { ?>
 <script>
-	<?= $item['cookie']; ?>
+    <?= $item['cookie']; ?>
 </script>
 <?php }; ?>
