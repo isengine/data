@@ -97,11 +97,11 @@ class Data extends Master
         // в секундах или спец.формате, например '1:hour' или '3600'
 
         //System::debug($cookie);
-        
+
         $time = time();
         $c_ses = (int) Sessions::getCookie('is-expired-' . $cookie['name']);
         $c_set = Datetimes::amount($cookie['time']);
-        
+
         // проверка куки, возвращает результат
         return ($c_set > 0 && $c_ses + $c_set <= $time) ? 'document.cookie = "is-expired-' . $cookie['name'] . '=' . $time . ';path=/; max-age=' . $c_set . '";' : null;
     }
